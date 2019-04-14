@@ -1,0 +1,5 @@
+{
+    "port": "/dev/cu.usbmodem141101",
+    "board": "arduino:avr:uno",
+    "sketch": "ikea_kitchen.ino"
+}
