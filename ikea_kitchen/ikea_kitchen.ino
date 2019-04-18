@@ -8,6 +8,8 @@
 #define BUTTON_BLUE_PIN     12
 #define BUTTON_YEALLOW_PIN  13
 
+#define BUZZER_PIN 5
+
 #define PIXEL_PIN    8    // Digital IO pin connected to the NeoPixels.
 #define PIXEL_COUNT 16
 
@@ -42,11 +44,16 @@ auto timer = timer_create_default(); // create a timer with default settings
 byte patternIndex = 0;
 byte oldPatternIndex = 0;
 int angle = 0;
+int counter = 0;
 
 unsigned long patternInterval = 50 ; // default time between steps in the pattern
-unsigned long lastUpdate = 0 ; // for millis() when last update occoured
+unsigned long lastPatternUpdate = 0 ; // for millis() when last update occoured
+
+unsigned long buzzerInterval = 700; // default time between steps in the pattern
+unsigned long lastBuzzerUpdate = 0 ; // for millis() when last update occoured
 
 bool isStarted = false;
+bool isBuzzerStarted = false;
 
 void setup() {
     Serial.begin(115200);
@@ -68,7 +75,10 @@ void setup() {
   
     tm1637.init();
     tm1637.set(BRIGHT_TYPICAL);//BRIGHT_TYPICAL = 2,BRIGHT_DARKEST = 0,BRIGHTEST = 7;
-  
+
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
+    
     pinMode(ROTARY_ANGLE_SENSOR_PIN, INPUT);
 
     timer.every(1000, displayTime);
@@ -87,18 +97,55 @@ void loop() {
         }
         angle = newAngle;
 
-        if (oldPatternIndex != patternIndex) {
+        if (oldPatternIndex != patternIndex && patternIndex != 0) {
+            counter = angle;
             isStarted = true;
         }
     }
   
     oldPatternIndex = patternIndex;
 
-    if (millis() - lastUpdate > patternInterval) {
+    if (millis() - lastPatternUpdate > patternInterval) {
         updatePattern(patternIndex);
     }
 
+    /*if (millis() - lastBuzzerUpdate > buzzerInterval) {
+        microwaveDoneBuzzer();
+    }*/
+
     timer.tick();
+}
+//////// BUZZER //////////
+
+void microwaveDoneBuzzer() {
+    static int i = 0;
+    static bool on = false;
+    static bool flash = true;
+
+    if (!isBuzzerStarted) {
+        return;
+    }
+
+    if (flash) {
+        if (!on) {
+            tone(BUZZER_PIN, 2000, 500);
+            on = true;
+        }
+        buzzerInterval = 700;
+    } else {
+        noTone(BUZZER_PIN);
+        on = false;
+        buzzerInterval = 350;
+    }
+
+    flash = !flash;
+
+    i++;
+    if (i >= 3) {
+        isBuzzerStarted = false;
+    }
+
+    lastBuzzerUpdate = millis();
 }
 
 //////// DISPLAY /////////
@@ -108,14 +155,17 @@ bool displayTime(void *) {
         return true;
     }
 
-    Serial.println(angle);
-    
-    angle--;
-    if (angle <= 0) {
-        isStarted = false;
-    }
+    Serial.println(counter);
 
-    tm1637.displayNum(angle);
+    counter--;
+
+    tm1637.displayNum(counter);
+    
+    if (counter <= 0) {
+        patternIndex = 0;
+        isStarted = false;
+        isBuzzerStarted = true;
+    }
     
     return true; // repeat? true
 }
@@ -141,12 +191,11 @@ void onRedButtonPressed() {
         newPatternIndex = 0;
   
     patternIndex = newPatternIndex;
-    Serial.println(patternIndex);
 }
 
 void onWhiteButtonPressed() {
     Serial.println("WHITE Button has been pressed!");
-    patternIndex = 0;
+    patternIndex = 1;
 }
 
 void onBlueButtonPressed() {
@@ -195,7 +244,7 @@ void colorWipe(uint32_t c) {
         i = 0;
     }
 
-    lastUpdate = millis(); // time for next change to the display
+    lastPatternUpdate = millis(); // time for next change to the display
 }
 
 void rainbow() {
@@ -212,7 +261,7 @@ void rainbow() {
         j = 0;
     }
 
-    lastUpdate = millis();
+    lastPatternUpdate = millis();
 }
 
 // Slightly different, this makes the rainbow equally distributed throughout
@@ -230,7 +279,7 @@ void rainbowCycle() {
         j = 0;
     }
 
-    lastUpdate = millis();    
+    lastPatternUpdate = millis();    
 }
 
 //Theatre-style crawling lights.
@@ -256,7 +305,7 @@ void theaterChase(uint32_t c) {
     }   
     on = !on;
 
-    lastUpdate = millis();
+    lastPatternUpdate = millis();
 }
 
 //Theatre-style crawling lights with rainbow effect
@@ -283,7 +332,7 @@ void theaterChaseRainbow() {
     }   
     on = !on;
 
-    lastUpdate = millis();  
+    lastPatternUpdate = millis();  
 }
 
 // Input a value 0 to 255 to get a color value.
@@ -302,5 +351,5 @@ uint32_t Wheel(byte WheelPos) {
 }
 
 bool isStartable() {
-  return !isStarted;
+    return !isStarted;
 }
