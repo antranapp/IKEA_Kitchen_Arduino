@@ -27,6 +27,12 @@ EasyButton whiteButton(BUTTON_WHITE_PIN);
 EasyButton blueButton(BUTTON_BLUE_PIN);
 EasyButton yeallowButton(BUTTON_YEALLOW_PIN);
 
+const int numReadings = 10;
+int readings[numReadings];      // the readings from the analog input
+int readIndex = 0;              // the index of the current reading
+int total = 0;                  // the running total
+int average = 0;                // the average
+int angle = 0;
 
 // Parameter 1 = number of pixels in strip,  neopixel stick has 8
 // Parameter 2 = pin number (most are valid)
@@ -43,20 +49,20 @@ auto timer = timer_create_default(); // create a timer with default settings
 
 byte patternIndex = 0;
 byte oldPatternIndex = 0;
-int angle = 0;
 int counter = 0;
 
 unsigned long patternInterval = 50 ; // default time between steps in the pattern
 unsigned long lastPatternUpdate = 0 ; // for millis() when last update occoured
 
-unsigned long buzzerInterval = 700; // default time between steps in the pattern
-unsigned long lastBuzzerUpdate = 0 ; // for millis() when last update occoured
-
 bool isStarted = false;
-bool isBuzzerStarted = false;
 
 void setup() {
     Serial.begin(115200);
+
+    // initialize all the readings to 0:
+    for (int thisReading = 0; thisReading < numReadings; thisReading++) {
+        readings[thisReading] = 0;
+    }
   
     redButton.begin();
     redButton.onPressed(onRedButtonPressed);
@@ -109,43 +115,17 @@ void loop() {
         updatePattern(patternIndex);
     }
 
-    /*if (millis() - lastBuzzerUpdate > buzzerInterval) {
-        microwaveDoneBuzzer();
-    }*/
-
     timer.tick();
 }
 //////// BUZZER //////////
 
 void microwaveDoneBuzzer() {
-    static int i = 0;
-    static bool on = false;
-    static bool flash = true;
-
-    if (!isBuzzerStarted) {
-        return;
-    }
-
-    if (flash) {
-        if (!on) {
-            tone(BUZZER_PIN, 2000, 500);
-            on = true;
-        }
-        buzzerInterval = 700;
-    } else {
+    for (int i = 0; i < 3; i++) {
+        tone(BUZZER_PIN, 2000, 500);
+        delay(700);
         noTone(BUZZER_PIN);
-        on = false;
-        buzzerInterval = 350;
+        delay(350);
     }
-
-    flash = !flash;
-
-    i++;
-    if (i >= 3) {
-        isBuzzerStarted = false;
-    }
-
-    lastBuzzerUpdate = millis();
 }
 
 //////// DISPLAY /////////
@@ -164,7 +144,7 @@ bool displayTime(void *) {
     if (counter <= 0) {
         patternIndex = 0;
         isStarted = false;
-        isBuzzerStarted = true;
+        microwaveDoneBuzzer();
     }
     
     return true; // repeat? true
@@ -173,9 +153,26 @@ bool displayTime(void *) {
 //////// ROTATORY ANGLE SENSOR ///////
 
 int getAngle() {
-    int sensor_value = analogRead(ROTARY_ANGLE_SENSOR_PIN);
-    float voltage;
-    voltage = (float)sensor_value*ADC_REF/1023;
+
+    // subtract the last reading:
+    total = total - readings[readIndex];
+    // read from the sensor:
+    readings[readIndex] = analogRead(ROTARY_ANGLE_SENSOR_PIN);
+    // add the reading to the total:
+    total = total + readings[readIndex];
+    // advance to the next position in the array:
+    readIndex = readIndex + 1;
+  
+    // if we're at the end of the array...
+    if (readIndex >= numReadings) {
+        // ...wrap around to the beginning:
+        readIndex = 0;
+    }
+  
+    // calculate the average:
+    average = total / numReadings;
+      
+    float voltage = (float)average*ADC_REF/1023;
     float degrees = (voltage*FULL_ANGLE)/GROVE_VCC;
     return degrees;
 }
