@@ -20,7 +20,7 @@
 #define ADC_REF 5//reference voltage of ADC is 5v.If the Vcc switch on the seeeduino
          //board switches to 3V3, the ADC_REF should be 3.3
 #define GROVE_VCC 5//VCC of the grove interface is normally 5v
-#define FULL_ANGLE 300//full value of the rotary angle is 300 degrees
+#define FULL_ANGLE 20//full value of the rotary angle is 300 degrees
 
 EasyButton redButton(BUTTON_RED_PIN);
 EasyButton whiteButton(BUTTON_WHITE_PIN);
@@ -66,15 +66,19 @@ void setup() {
   
     redButton.begin();
     redButton.onPressed(onRedButtonPressed);
-  
+    redButton.onSequence(3, 2000, onButtonLongPressed);
+    
     whiteButton.begin();
     whiteButton.onPressed(onWhiteButtonPressed);
+    whiteButton.onSequence(3, 2000, onButtonLongPressed);
   
     blueButton.begin();
     blueButton.onPressed(onBlueButtonPressed);
+    blueButton.onSequence(3, 2000, onButtonLongPressed);
   
     yeallowButton.begin();
     yeallowButton.onPressed(onYeallowButtonPressed);
+    yeallowButton.onSequence(3, 2000, onButtonLongPressed);
   
     strip.begin();
     strip.show(); // Initialize all pixels to 'off'
@@ -91,12 +95,13 @@ void setup() {
 }
 
 void loop() {
-    if (isStartable()) {
-        redButton.read();
-        whiteButton.read();
-        blueButton.read();
-        yeallowButton.read();  
 
+    redButton.read();
+    whiteButton.read();
+    blueButton.read();
+    yeallowButton.read();  
+      
+    if (isStartable()) {
         int newAngle = getAngle();
         if (newAngle != angle) {
             tm1637.displayNum(newAngle);
@@ -137,8 +142,6 @@ bool displayTime(void *) {
 
     Serial.println(counter);
 
-    counter--;
-
     tm1637.displayNum(counter);
     
     if (counter <= 0) {
@@ -146,7 +149,9 @@ bool displayTime(void *) {
         isStarted = false;
         microwaveDoneBuzzer();
     }
-    
+
+    counter--;
+
     return true; // repeat? true
 }
 
@@ -174,6 +179,10 @@ int getAngle() {
       
     float voltage = (float)average*ADC_REF/1023;
     float degrees = (voltage*FULL_ANGLE)/GROVE_VCC;
+
+    if (degrees < 0) {
+        degrees = 0;
+    }
     return degrees;
 }
 
@@ -181,27 +190,51 @@ int getAngle() {
 
 void onRedButtonPressed() {
     Serial.println("RED Button has been pressed!");
+
+    if (!isStartable) {
+      return;
+    }
   
     int newPatternIndex = patternIndex;
-    newPatternIndex ++;
+    newPatternIndex++;
     if (newPatternIndex > 6)
         newPatternIndex = 0;
   
     patternIndex = newPatternIndex;
 }
 
+void onButtonLongPressed() {
+  Serial.println("Long pressed detected");
+  counter = 0;
+}
+
 void onWhiteButtonPressed() {
     Serial.println("WHITE Button has been pressed!");
+
+    if (!isStartable) {
+      return;
+    }
+  
     patternIndex = 1;
 }
 
 void onBlueButtonPressed() {
     Serial.println("BLUE Button has been pressed!");
+
+    if (!isStartable) {
+      return;
+    }
+  
     patternIndex = 2;
 }
 
 void onYeallowButtonPressed() {
     Serial.println("YEALLOW Button has been pressed!");
+
+    if (!isStartable) {
+      return;
+    }
+  
     patternIndex = 3;
 }
 
